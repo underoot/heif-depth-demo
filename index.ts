@@ -1,10 +1,26 @@
 import * as THREE from "three";
+import libheifJs from "libheif-js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+console.log(libheifJs);
+debugger;
+
+const mouseCoordinates = new THREE.Vector2(0, 0);
+
+const fileInput = document.querySelector("input")!;
+
+let fileDefined = false;
+
+window.addEventListener("mousemove", (event) => {
+  mouseCoordinates.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouseCoordinates.y = -(event.clientY / window.innerHeight) * 2 + 1;
+});
 
 export class FBO {
   #scene: THREE.Scene;
   #camera: THREE.OrthographicCamera;
   #rtt: THREE.WebGLRenderTarget;
+  #mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   #renderer: THREE.WebGLRenderer;
 
   particles: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
@@ -72,6 +88,8 @@ export class FBO {
       )
     );
 
+    this.#mesh = new THREE.Mesh(bufferGeometry, simulationMaterial);
+
     this.#scene.add(new THREE.Mesh(bufferGeometry, simulationMaterial));
 
     const l = width * height;
@@ -88,13 +106,75 @@ export class FBO {
     geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
 
     this.particles = new THREE.Points(geometry, renderMaterial);
+
+    fileInput.addEventListener("change", async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const jpgBuffer = await file.arrayBuffer();
+
+      const jpgBlob = new Blob([jpgBuffer], { type: "image/jpeg" });
+      const jpgUrl = URL.createObjectURL(jpgBlob);
+      const jpgImage = new Image();
+      jpgImage.src = jpgUrl;
+
+      document.body.appendChild(jpgImage);
+      jpgImage.onload = () => {
+        const width = jpgImage.width;
+        const height = jpgImage.height;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.drawImage(jpgImage, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = new Float32Array(width * height * 4);
+
+        for (let i = 0; i < data.length; i += 4) {
+          const x = Math.floor(i / 4);
+          const r = imageData.data[i];
+          const g = imageData.data[i + 1];
+          const b = imageData.data[i + 2];
+
+          data[i] = ((x % width) / width) * 2;
+          data[i + 1] = (1 - x / width / height) * 2;
+          data[i + 2] = (r / 255 + g / 255 + b / 255) / 2;
+
+          data[i + 3] =
+            imageData.data[i] +
+            (imageData.data[i + 1] << 8) +
+            (imageData.data[i + 2] << 16);
+        }
+
+        fileDefined = true;
+
+        const positions = new THREE.DataTexture(
+          data,
+          width,
+          height,
+          THREE.RGBAFormat,
+          THREE.FloatType
+        );
+        positions.needsUpdate = true;
+
+        this.#mesh.material.uniforms.positions.value = positions;
+      };
+    });
   }
 
   update() {
     this.#renderer.setRenderTarget(this.#rtt);
     this.#renderer.render(this.#scene, this.#camera);
     this.#renderer.setRenderTarget(null);
-    this.particles.material.uniforms.positions.value = this.#rtt.texture;
+
+    if (!fileDefined) {
+      this.particles.material.uniforms.positions.value = this.#rtt.texture;
+    }
+
     this.particles.material.uniforms.timestamp.value = performance.now();
   }
 }
@@ -113,10 +193,6 @@ function getRandomData(width: number, height: number, size: number) {
     data[i] = x;
     data[i + 1] = y;
     data[i + 2] = z;
-    data[i + 3] =
-      Math.random() * 255 +
-      ((Math.random() * 255) << 8) +
-      ((Math.random() * 255) << 16);
   }
 
   return data;
@@ -134,7 +210,7 @@ function init() {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(60, w / h, 1, 10000);
 
-  camera.position.z = 600;
+  camera.position.z = 5;
 
   renderer = new THREE.WebGLRenderer();
   renderer.setSize(w, h);
@@ -180,6 +256,7 @@ function init() {
       positions: { value: null },
       pointSize: { value: 2 },
       timestamp: { value: 0 },
+      mouseCoordinates: { value: new THREE.Vector2(0, 0) },
     },
     vertexShader: `
       #define PI 3.1415926535897932384626433832795
@@ -189,25 +266,11 @@ function init() {
       uniform sampler2D positions;
       uniform float pointSize;
       uniform float timestamp;
-
-      vec2 cartesianToSpherical(vec3 v) {
-        float r = length(v);                      // distance from origin
-        float theta = atan(v.y, v.x);             // azimuthal angle (longitude)
-        float phi = acos(clamp(v.z / r, -1.0, 1.0)); // polar angle (colatitude)
-        return vec2(theta, phi);
-    }
+      uniform vec2 mouseCoordinates;
 
       void main() {
         vec4 pos = texture2D(positions, position.xy);
         int color = int(pos.a);
-
-        // Make waves on sphere
-        vec2 spherical = cartesianToSpherical(pos.xyz);
-        float theta_n = spherical.x + PI;
-        float phi_n = spherical.y;
-
-        pos += sin(theta_n * 30.0 * sin(timestamp * 0.0001)) / cos(phi_n * 30.0) * 10.0;
-
 
         vColor = vec3(
           float(color & 255) / 255.,
@@ -223,7 +286,7 @@ function init() {
       in vec3 vColor;
 
       void main() {
-        gl_FragColor = vec4(vColor, .25);
+        gl_FragColor = vec4(vColor, .4);
       }
     `,
     transparent: true,
