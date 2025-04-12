@@ -203,10 +203,10 @@ function init() {
 
         // Make waves on sphere
         vec2 spherical = cartesianToSpherical(pos.xyz);
-        float theta_n = spherical.x;
+        float theta_n = spherical.x + PI;
         float phi_n = spherical.y;
 
-        pos /= sin(theta_n * 30.0 * sin(timestamp * 0.0001));
+        pos += sin(theta_n * 30.0 * sin(timestamp * 0.0001)) / cos(phi_n * 30.0) * 10.0;
 
 
         vColor = vec3(
