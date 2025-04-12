@@ -95,6 +95,7 @@ export class FBO {
     this.#renderer.render(this.#scene, this.#camera);
     this.#renderer.setRenderTarget(null);
     this.particles.material.uniforms.positions.value = this.#rtt.texture;
+    this.particles.material.uniforms.timestamp.value = performance.now();
   }
 }
 
@@ -178,16 +179,35 @@ function init() {
     uniforms: {
       positions: { value: null },
       pointSize: { value: 2 },
+      timestamp: { value: 0 },
     },
     vertexShader: `
+      #define PI 3.1415926535897932384626433832795
+
       out vec3 vColor;
 
       uniform sampler2D positions;
       uniform float pointSize;
+      uniform float timestamp;
+
+      vec2 cartesianToSpherical(vec3 v) {
+        float r = length(v);                      // distance from origin
+        float theta = atan(v.y, v.x);             // azimuthal angle (longitude)
+        float phi = acos(clamp(v.z / r, -1.0, 1.0)); // polar angle (colatitude)
+        return vec2(theta, phi);
+    }
 
       void main() {
         vec4 pos = texture2D(positions, position.xy);
         int color = int(pos.a);
+
+        // Make waves on sphere
+        vec2 spherical = cartesianToSpherical(pos.xyz);
+        float theta_n = spherical.x;
+        float phi_n = spherical.y;
+
+        pos /= sin(theta_n * 30.0 * sin(timestamp * 0.0001));
+
 
         vColor = vec3(
           float(color & 255) / 255.,
