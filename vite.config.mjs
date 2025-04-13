@@ -23,4 +23,5 @@ const copyPlugin = copy({
 
 export default defineConfig({
   plugins: [commonjs(), tailwindcss(), copyPlugin],
+  base: "/heif-depth-demo/",
 });
