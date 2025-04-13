@@ -2,17 +2,54 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import libheif from "./libheif/index.js";
 
-const mouseCoordinates = new THREE.Vector2(0, 0);
+const helpBtn = document.getElementById("helpBtn")!;
+const helpBtn2 = document.getElementById("helpBtn2")!;
+const modal = document.getElementById("modal")!;
+const closeModal = document.getElementById("closeModal")!;
+const tabButtons = document.querySelectorAll(".tab-button")!;
+const tabPanels = document.querySelectorAll(".tab-panel")!;
+const form = document.getElementById("form")!;
+const arrow = document.querySelector(".arrow")!;
+
+arrow.addEventListener("click", () => {
+  form.classList.toggle("folded");
+});
+
+helpBtn.addEventListener("click", () => {
+  modal.classList.remove("hidden");
+});
+
+helpBtn2.addEventListener("click", () => {
+  modal.classList.remove("hidden");
+});
+
+closeModal.addEventListener("click", () => {
+  modal.classList.add("hidden");
+});
+
+tabButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const targetTab = button.getAttribute("data-tab");
+
+    tabButtons.forEach((btn) => {
+      btn.classList.remove("text-blue-600", "border-blue-600");
+      btn.classList.add("text-gray-600");
+    });
+
+    button.classList.add("text-blue-600", "border-b-2", "border-blue-600");
+
+    tabPanels.forEach((panel) => {
+      panel.classList.toggle(
+        "hidden",
+        panel.getAttribute("data-tab") !== targetTab
+      );
+    });
+  });
+});
 
 const depthInput = document.querySelector("#depthInput")!;
-const imageInput = document.querySelector("#imageInput")!;
 
 let fileDefined = false;
-
-window.addEventListener("mousemove", (event) => {
-  mouseCoordinates.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouseCoordinates.y = -(event.clientY / window.innerHeight) * 2 + 1;
-});
 
 export class FBO {
   #scene: THREE.Scene;
@@ -108,6 +145,8 @@ export class FBO {
     depthInput.addEventListener("change", async (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
+
+      document.body.classList.add("loading");
       const heicBuffer = await file.arrayBuffer();
       const decoder = new libheif.HeifDecoder();
       const [heifImage] = decoder.decode(heicBuffer);
@@ -178,8 +217,6 @@ export class FBO {
       const depthWidth = depthImage.get_width();
       const depthHeight = depthImage.get_height();
 
-      console.log(width, height, depthWidth, depthHeight);
-
       const data = new Float32Array(width * height * 4);
 
       for (let i = 0; i < data.length; i += 4) {
@@ -188,10 +225,10 @@ export class FBO {
         const depthX = Math.floor(((x % width) / width) * depthWidth);
         const depthY = Math.floor((x / width / height) * depthHeight);
 
-        data[i] = (x % width) / width;
-        data[i + 1] = 1 - x / width / height;
+        data[i] = (x % width) / width - 0.5;
+        data[i + 1] = 1 - x / width / height - 0.5;
         data[i + 2] =
-          depthData.data[depthY * depthWidth * 4 + depthX * 4] / 255;
+          depthData.data[depthY * depthWidth * 4 + depthX * 4] / 255 - 0.5;
 
         if (Number.isNaN(data[i + 2])) {
           data[i + 2] = 0;
@@ -204,6 +241,9 @@ export class FBO {
       }
 
       fileDefined = true;
+
+      document.body.classList.remove("loading");
+      form.classList.add("folded");
 
       const positions = new THREE.DataTexture(
         data,
@@ -226,12 +266,10 @@ export class FBO {
     if (!fileDefined) {
       this.particles.material.uniforms.positions.value = this.#rtt.texture;
     }
-
-    this.particles.material.uniforms.timestamp.value = performance.now();
   }
 }
 
-function getRandomData(width: number, height: number, size: number) {
+function getSphereData(width: number, height: number, size: number) {
   let len = width * height * 4;
   const data = new Float32Array(len);
 
@@ -245,6 +283,10 @@ function getRandomData(width: number, height: number, size: number) {
     data[i] = x;
     data[i + 1] = y;
     data[i + 2] = z;
+    data[i + 3] =
+      Math.random() * 255 +
+      ((Math.random() * 255) << 8) +
+      ((Math.random() * 255) << 16);
   }
 
   return data;
@@ -262,16 +304,18 @@ function init() {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(60, w / h, 1, 10000);
 
-  camera.position.z = 5;
+  camera.position.set(0.5, -0.25, 3);
+  camera.lookAt(0, 0, 0);
 
-  renderer = new THREE.WebGLRenderer();
+  renderer = new THREE.WebGLRenderer({
+    canvas: document.querySelector("#canvas")!,
+  });
   renderer.setSize(w, h);
-  document.body.appendChild(renderer.domElement);
 
   const width = 512;
   const height = 512;
 
-  const data = getRandomData(width, height, 512);
+  const data = getSphereData(width, height, 1);
 
   const positions = new THREE.DataTexture(
     data,
@@ -307,18 +351,12 @@ function init() {
     uniforms: {
       positions: { value: null },
       pointSize: { value: 1 },
-      timestamp: { value: 0 },
-      mouseCoordinates: { value: new THREE.Vector2(0, 0) },
     },
     vertexShader: `
-      #define PI 3.1415926535897932384626433832795
-
       out vec3 vColor;
 
       uniform sampler2D positions;
       uniform float pointSize;
-      uniform float timestamp;
-      uniform vec2 mouseCoordinates;
 
       void main() {
         vec4 pos = texture2D(positions, position.xy);

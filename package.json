@@ -1,12 +1,25 @@
 {
+  "name": "@underoot/heif-depth-demo",
+  "version": "0.0.1",
+  "license": "MIT",
+  "description": "A demo for HEIF depth image processing",
+  "scripts": {
+    "build": "rm -rf dist && vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
   "devDependencies": {
     "@types/three": "^0.175.0",
     "vite": "^6.2.6",
-    "vite-plugin-commonjs": "^0.10.4"
+    "vite-plugin-commonjs": "^0.10.4",
+    "vite-plugin-copy": "^0.1.6"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "@tailwindcss/vite": "^4.1.3",
     "heic2any": "^0.0.4",
     "libheif-js": "^1.18.2",
+    "tailwindcss": "^4.1.3",
     "three": "^0.175.0"
   }
 }
