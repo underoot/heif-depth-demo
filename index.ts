@@ -1,13 +1,11 @@
 import * as THREE from "three";
-import libheifJs from "libheif-js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-
-console.log(libheifJs);
-debugger;
+import libheif from "./libheif/index.js";
 
 const mouseCoordinates = new THREE.Vector2(0, 0);
 
-const fileInput = document.querySelector("input")!;
+const depthInput = document.querySelector("#depthInput")!;
+const imageInput = document.querySelector("#imageInput")!;
 
 let fileDefined = false;
 
@@ -107,62 +105,116 @@ export class FBO {
 
     this.particles = new THREE.Points(geometry, renderMaterial);
 
-    fileInput.addEventListener("change", async (event) => {
+    depthInput.addEventListener("change", async (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const jpgBuffer = await file.arrayBuffer();
+      const heicBuffer = await file.arrayBuffer();
+      const decoder = new libheif.HeifDecoder();
+      const [heifImage] = decoder.decode(heicBuffer);
+      const auxImageIds =
+        libheif.heif_js_image_handle_get_list_of_aux_image_IDs(
+          heifImage.handle
+        );
 
-      const jpgBlob = new Blob([jpgBuffer], { type: "image/jpeg" });
-      const jpgUrl = URL.createObjectURL(jpgBlob);
-      const jpgImage = new Image();
-      jpgImage.src = jpgUrl;
+      let depthImage;
 
-      document.body.appendChild(jpgImage);
-      jpgImage.onload = () => {
-        const width = jpgImage.width;
-        const height = jpgImage.height;
+      let canvas = document.createElement("canvas");
+      canvas.width = heifImage.get_width();
+      canvas.height = heifImage.get_height();
 
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
+      let ctx = canvas.getContext("2d")!;
 
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+      let imageData = ctx.createImageData(
+        heifImage.get_width(),
+        heifImage.get_height()
+      );
 
-        ctx.drawImage(jpgImage, 0, 0);
+      await new Promise<void>((resolve, reject) => {
+        heifImage.display(imageData, (displayData) => {
+          if (!displayData) {
+            return reject(new Error("HEIF processing error"));
+          }
 
-        const imageData = ctx.getImageData(0, 0, width, height);
-        const data = new Float32Array(width * height * 4);
+          resolve();
+        });
+      });
 
-        for (let i = 0; i < data.length; i += 4) {
-          const x = Math.floor(i / 4);
-          const r = imageData.data[i];
-          const g = imageData.data[i + 1];
-          const b = imageData.data[i + 2];
+      for (let auxID of auxImageIds) {
+        const auxImage = new libheif.HeifImage(
+          libheif.heif_js_context_get_image_handle(decoder.decoder, auxID)
+        );
 
-          data[i] = ((x % width) / width) * 2;
-          data[i + 1] = (1 - x / width / height) * 2;
-          data[i + 2] = (r / 255 + g / 255 + b / 255) / 2;
+        if (
+          libheif.heif_js_image_handle_get_auxiliary_type(auxImage.handle) ===
+          "urn:mpeg:hevc:2015:auxid:2"
+        ) {
+          depthImage = auxImage;
+          break;
+        }
+      }
 
-          data[i + 3] =
-            imageData.data[i] +
-            (imageData.data[i + 1] << 8) +
-            (imageData.data[i + 2] << 16);
+      canvas = document.createElement("canvas");
+      ctx = canvas.getContext("2d")!;
+
+      canvas.width = depthImage.get_width();
+      canvas.height = depthImage.get_height();
+      const depthData = ctx.createImageData(
+        depthImage.get_width(),
+        depthImage.get_height()
+      );
+
+      await new Promise<void>((resolve, reject) => {
+        depthImage.display(depthData, (displayData) => {
+          if (!displayData) {
+            return reject(new Error("HEIF processing error"));
+          }
+
+          resolve();
+        });
+      });
+
+      const width = heifImage.get_width();
+      const height = heifImage.get_height();
+      const depthWidth = depthImage.get_width();
+      const depthHeight = depthImage.get_height();
+
+      console.log(width, height, depthWidth, depthHeight);
+
+      const data = new Float32Array(width * height * 4);
+
+      for (let i = 0; i < data.length; i += 4) {
+        const x = Math.floor(i / 4);
+
+        const depthX = Math.floor(((x % width) / width) * depthWidth);
+        const depthY = Math.floor((x / width / height) * depthHeight);
+
+        data[i] = (x % width) / width;
+        data[i + 1] = 1 - x / width / height;
+        data[i + 2] =
+          depthData.data[depthY * depthWidth * 4 + depthX * 4] / 255;
+
+        if (Number.isNaN(data[i + 2])) {
+          data[i + 2] = 0;
         }
 
-        fileDefined = true;
+        data[i + 3] =
+          imageData.data[i] +
+          (imageData.data[i + 1] << 8) +
+          (imageData.data[i + 2] << 16);
+      }
 
-        const positions = new THREE.DataTexture(
-          data,
-          width,
-          height,
-          THREE.RGBAFormat,
-          THREE.FloatType
-        );
-        positions.needsUpdate = true;
+      fileDefined = true;
 
-        this.#mesh.material.uniforms.positions.value = positions;
-      };
+      const positions = new THREE.DataTexture(
+        data,
+        width,
+        height,
+        THREE.RGBAFormat,
+        THREE.FloatType
+      );
+      positions.needsUpdate = true;
+
+      this.#mesh.material.uniforms.positions.value = positions;
     });
   }
 
@@ -216,10 +268,10 @@ function init() {
   renderer.setSize(w, h);
   document.body.appendChild(renderer.domElement);
 
-  const width = 256;
-  const height = 256;
+  const width = 512;
+  const height = 512;
 
-  const data = getRandomData(width, height, 256);
+  const data = getRandomData(width, height, 512);
 
   const positions = new THREE.DataTexture(
     data,
@@ -254,7 +306,7 @@ function init() {
   const renderShader = new THREE.ShaderMaterial({
     uniforms: {
       positions: { value: null },
-      pointSize: { value: 2 },
+      pointSize: { value: 1 },
       timestamp: { value: 0 },
       mouseCoordinates: { value: new THREE.Vector2(0, 0) },
     },
@@ -286,7 +338,7 @@ function init() {
       in vec3 vColor;
 
       void main() {
-        gl_FragColor = vec4(vColor, .4);
+        gl_FragColor = vec4(vColor, 1.0);
       }
     `,
     transparent: true,
