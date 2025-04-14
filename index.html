@@ -7,14 +7,14 @@
 
   <meta property="og:title" content="HEIF Depth Visualizer">
   <meta property="og:description" content="Upload a HEIF file with depth data to visualize it in 3D.">
-  <meta property="og:image" content="images/preview.png">
+  <meta property="og:image" content="images/preview.jpg">
   <meta property="og:url" content="https://underoot.dev/heif-depth-visualizer">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="HEIF Depth Visualizer">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="HEIF Depth Visualizer">
   <meta name="twitter:description" content="Upload a HEIF file with depth data to visualize it in 3D.">
-  <meta name="twitter:image" content="images/preview.png">
+  <meta name="twitter:image" content="images/preview.jpg">
   <meta name="twitter:site" content="@underoot">
   <meta name="twitter:creator" content="@underoot">
   <meta name="theme-color" content="#3b82f6">
@@ -26,7 +26,6 @@
   <title>HEIF Depth Visualizer</title>
   <style>
     @import "tailwindcss";
-    @import "@fortawesome/fontawesome-free/css/all.min.css";
 
     body {
       margin: 0
@@ -91,7 +90,7 @@
   <canvas id="canvas"></canvas>
   <div id="form" class="relative bg-white shadow-xl rounded-2xl p-8 pb-12 max-w-lg w-full relative">
     <button id="helpBtn" class="absolute top-4 right-4 text-blue-500 hover:text-blue-700 text-xl cursor-pointer">
-      <i class="fa-solid fa-circle-question"></i>
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000"><path d="M478-240q21 0 35.5-14.5T528-290q0-21-14.5-35.5T478-340q-21 0-35.5 14.5T428-290q0 21 14.5 35.5T478-240Zm-36-154h74q0-33 7.5-52t42.5-52q26-26 41-49.5t15-56.5q0-56-41-86t-97-30q-57 0-92.5 30T342-618l66 26q5-18 22.5-39t53.5-21q32 0 48 17.5t16 38.5q0 20-12 37.5T506-526q-44 39-54 59t-10 73Zm38 314q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
     </button>
     <h2 class="text-2xl font-semibold mb-4">HEIF Depth Visualizer</h2>
     <p class="text-gray-600 mb-4">
@@ -114,7 +113,7 @@
   <div id="errorModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm items-center justify-center flex z-50 hidden">
     <div class="bg-white rounded-xl max-w-2xl w-full shadow-lg p-6 relative">
       <button id="closeErrorModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-lg cursor-pointer">
-        <i class="fa-solid fa-xmark"></i>
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#1f1f1f"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
       </button>
 
       <h2 class="text-xl font-semibold mb-4">Error</h2>
@@ -125,8 +124,8 @@
   </div>
   <div id="modal" class="flex items-center justify-center fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50">
     <div class="bg-white rounded-xl max-w-2xl w-full shadow-lg p-6 relative">
-      <button id="closeModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-lg">
-        <i class="fa-solid fa-xmark"></i>
+      <button id="closeModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-lg cursor-pointer">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#1f1f1f"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
       </button>
 
       <h2 class="text-xl font-semibold mb-4">How to Export HEIF with Depth</h2>
@@ -164,8 +163,8 @@
     </div>
   </div>
   <!-- Share button -->
-  <div id="shareBtn" class="fixed bottom-4 right-4 bg-blue-500 text-white rounded-full p-3 shadow-lg cursor-pointer hover:bg-blue-600 transition duration-200 w-12 items-center text-center hidden">
-    <i class="fa-solid fa-share-alt"></i>
+  <div id="shareBtn" class="fixed bottom-4 right-4 bg-blue-500 text-white rounded-full p-3 shadow-lg cursor-pointer hover:bg-blue-600 transition duration-200 w-12 items-center text-center hidden" aria-label="Share">
+    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFF"><path d="M680-80q-50 0-85-35t-35-85q0-6 3-28L282-392q-16 15-37 23.5t-45 8.5q-50 0-85-35t-35-85q0-50 35-85t85-35q24 0 45 8.5t37 23.5l281-164q-2-7-2.5-13.5T560-760q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-24 0-45-8.5T598-672L317-508q2 7 2.5 13.5t.5 14.5q0 8-.5 14.5T317-452l281 164q16-15 37-23.5t45-8.5q50 0 85 35t35 85q0 50-35 85t-85 35Zm0-80q17 0 28.5-11.5T720-200q0-17-11.5-28.5T680-240q-17 0-28.5 11.5T640-200q0 17 11.5 28.5T680-160ZM200-440q17 0 28.5-11.5T240-480q0-17-11.5-28.5T200-520q-17 0-28.5 11.5T160-480q0 17 11.5 28.5T200-440Zm480-280q17 0 28.5-11.5T720-760q0-17-11.5-28.5T680-800q-17 0-28.5 11.5T640-760q0 17 11.5 28.5T680-720Zm0 520ZM200-480Zm480-280Z"/></svg>
   </div>
   <script type="module" src="./index.ts"></script>
 </body>

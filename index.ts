@@ -1,4 +1,21 @@
-import * as THREE from "three";
+import {
+  AdditiveBlending,
+  DataTexture,
+  WebGLRenderer,
+  Scene,
+  OrthographicCamera,
+  WebGLRenderTarget,
+  Mesh,
+  Points,
+  BufferGeometry,
+  BufferAttribute,
+  ShaderMaterial,
+  NearestFilter,
+  RGBAFormat,
+  FloatType,
+  PerspectiveCamera,
+  type RenderTargetOptions,
+} from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import libheif from "./libheif/index.js";
 
@@ -71,54 +88,47 @@ let fileDefined = false;
 let fileDefinedTimestamp = 0;
 
 export class FBO {
-  #scene: THREE.Scene;
-  #camera: THREE.OrthographicCamera;
+  #scene: Scene;
+  #camera: OrthographicCamera;
 
-  #rtt1: THREE.WebGLRenderTarget;
-  #rtt2: THREE.WebGLRenderTarget;
-  #currentRtt: THREE.WebGLRenderTarget;
+  #rtt1: WebGLRenderTarget;
+  #rtt2: WebGLRenderTarget;
+  #currentRtt: WebGLRenderTarget;
 
-  #mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
-  #renderer: THREE.WebGLRenderer;
+  #mesh: Mesh<BufferGeometry, ShaderMaterial>;
+  #renderer: WebGLRenderer;
 
-  particles: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  particles: Points<BufferGeometry, ShaderMaterial>;
 
   constructor(
     width: number,
     height: number,
-    renderer: THREE.WebGLRenderer,
-    simulationMaterial: THREE.ShaderMaterial,
-    renderMaterial: THREE.ShaderMaterial
+    renderer: WebGLRenderer,
+    simulationMaterial: ShaderMaterial,
+    renderMaterial: ShaderMaterial
   ) {
     renderer.getContext().getExtension("EXT_float_blend");
 
-    this.#scene = new THREE.Scene();
-    this.#camera = new THREE.OrthographicCamera(
-      -1,
-      1,
-      1,
-      -1,
-      1 / Math.pow(2, 53),
-      1
-    );
+    this.#scene = new Scene();
+    this.#camera = new OrthographicCamera(-1, 1, 1, -1, 1 / Math.pow(2, 53), 1);
 
-    const options: THREE.RenderTargetOptions = {
-      minFilter: THREE.NearestFilter,
-      magFilter: THREE.NearestFilter,
-      format: THREE.RGBAFormat,
-      type: THREE.FloatType,
+    const options: RenderTargetOptions = {
+      minFilter: NearestFilter,
+      magFilter: NearestFilter,
+      format: RGBAFormat,
+      type: FloatType,
     };
 
-    this.#rtt1 = new THREE.WebGLRenderTarget(width, height, options);
-    this.#rtt2 = new THREE.WebGLRenderTarget(width, height, options);
+    this.#rtt1 = new WebGLRenderTarget(width, height, options);
+    this.#rtt2 = new WebGLRenderTarget(width, height, options);
     this.#currentRtt = this.#rtt1;
     this.#renderer = renderer;
 
-    const bufferGeometry = new THREE.BufferGeometry();
+    const bufferGeometry = new BufferGeometry();
 
     bufferGeometry.setAttribute(
       "position",
-      new THREE.BufferAttribute(
+      new BufferAttribute(
         // prettier-ignore
         new Float32Array([
           -1, -1, 0, 
@@ -134,7 +144,7 @@ export class FBO {
 
     bufferGeometry.setAttribute(
       "uv",
-      new THREE.BufferAttribute(
+      new BufferAttribute(
         // prettier-ignore
         new Float32Array([
           0, 1,
@@ -148,9 +158,9 @@ export class FBO {
       )
     );
 
-    this.#mesh = new THREE.Mesh(bufferGeometry, simulationMaterial);
+    this.#mesh = new Mesh(bufferGeometry, simulationMaterial);
 
-    this.#scene.add(new THREE.Mesh(bufferGeometry, simulationMaterial));
+    this.#scene.add(new Mesh(bufferGeometry, simulationMaterial));
 
     const l = width * height;
     const vertices = new Float32Array(l * 3);
@@ -161,11 +171,11 @@ export class FBO {
       vertices[i3 + 1] = i / width / height;
     }
 
-    const geometry = new THREE.BufferGeometry();
+    const geometry = new BufferGeometry();
 
-    geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+    geometry.setAttribute("position", new BufferAttribute(vertices, 3));
 
-    this.particles = new THREE.Points(geometry, renderMaterial);
+    this.particles = new Points(geometry, renderMaterial);
 
     depthInput.addEventListener("change", async (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
@@ -270,12 +280,12 @@ export class FBO {
         fileDefined = true;
         fileDefinedTimestamp = performance.now();
 
-        const positions = new THREE.DataTexture(
+        const positions = new DataTexture(
           data,
           width,
           height,
-          THREE.RGBAFormat,
-          THREE.FloatType
+          RGBAFormat,
+          FloatType
         );
         positions.needsUpdate = true;
 
@@ -331,21 +341,21 @@ function getSphereData(width: number, height: number, size: number) {
 }
 
 let fbo: FBO;
-let scene: THREE.Scene;
-let camera: THREE.PerspectiveCamera;
-let renderer: THREE.WebGLRenderer;
+let scene: Scene;
+let camera: PerspectiveCamera;
+let renderer: WebGLRenderer;
 
 function init() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(60, w / h, 1, 10000);
+  scene = new Scene();
+  camera = new PerspectiveCamera(60, w / h, 1, 10000);
 
   camera.position.set(0.5, -0.25, 25);
   camera.lookAt(0, 0, 0);
 
-  renderer = new THREE.WebGLRenderer({
+  renderer = new WebGLRenderer({
     canvas: canvasEl,
     preserveDrawingBuffer: true,
   });
@@ -356,17 +366,11 @@ function init() {
 
   const data = getSphereData(width, height, 10);
 
-  const positions = new THREE.DataTexture(
-    data,
-    width,
-    height,
-    THREE.RGBAFormat,
-    THREE.FloatType
-  );
+  const positions = new DataTexture(data, width, height, RGBAFormat, FloatType);
 
   positions.needsUpdate = true;
 
-  const simulationShader = new THREE.ShaderMaterial({
+  const simulationShader = new ShaderMaterial({
     uniforms: {
       positions: { value: positions },
       timestamp: { value: 0 },
@@ -396,7 +400,7 @@ function init() {
     `,
   });
 
-  const renderShader = new THREE.ShaderMaterial({
+  const renderShader = new ShaderMaterial({
     uniforms: {
       positions: { value: null },
       pointSize: { value: 1 },
@@ -429,7 +433,7 @@ function init() {
       }
     `,
     transparent: true,
-    blending: THREE.AdditiveBlending,
+    blending: AdditiveBlending,
   });
 
   const controls = new OrbitControls(camera, renderer.domElement);
