@@ -5,6 +5,7 @@ import { dirname } from "path";
 import { defineConfig } from "vite";
 import commonjs from "vite-plugin-commonjs";
 import { copy } from "vite-plugin-copy";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 import tailwindcss from "@tailwindcss/vite";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,6 +23,11 @@ const copyPlugin = copy({
 });
 
 export default defineConfig({
-  plugins: [commonjs(), tailwindcss(), copyPlugin],
+  plugins: [
+    commonjs(),
+    tailwindcss(),
+    copyPlugin,
+    process.env.NODE_ENV === "development" && basicSsl(),
+  ],
   base: "/heif-depth-demo/",
 });

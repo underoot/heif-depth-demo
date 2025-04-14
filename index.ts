@@ -10,6 +10,7 @@ const tabButtons = document.querySelectorAll(".tab-button")!;
 const tabPanels = document.querySelectorAll(".tab-panel")!;
 const form = document.getElementById("form")!;
 const arrow = document.querySelector(".arrow")!;
+const shareBtn = document.getElementById("shareBtn")!;
 
 arrow.addEventListener("click", () => {
   form.classList.toggle("folded");
@@ -310,6 +311,7 @@ function init() {
 
   renderer = new THREE.WebGLRenderer({
     canvas: document.querySelector("#canvas")!,
+    preserveDrawingBuffer: true,
   });
   renderer.setSize(w, h);
 
@@ -351,7 +353,7 @@ function init() {
   const renderShader = new THREE.ShaderMaterial({
     uniforms: {
       positions: { value: null },
-      pointSize: { value: 1 },
+      pointSize: { value: 2 },
     },
     vertexShader: `
       out vec3 vColor;
@@ -409,5 +411,33 @@ function onResize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
+
+// Share image (read from context) and url with share API
+async function shareImage() {
+  const blob = await new Promise<Blob>((resolve) => {
+    (renderer.getContext().canvas as HTMLCanvasElement).toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        console.error("Failed to create blob from canvas");
+        resolve(new Blob());
+      }
+    });
+  });
+
+  if (!blob) return;
+
+  const file = new File([blob], "image.png", { type: "image/png" });
+
+  navigator
+    .share({
+      files: [file],
+      url: window.location.href,
+      text: "Check out my portrait photo in 3D!",
+    })
+    .catch((error) => console.error("Error sharing:", error));
+}
+
+shareBtn.addEventListener("click", shareImage);
 
 init();
