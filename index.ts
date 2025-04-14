@@ -11,6 +11,7 @@ const tabPanels = document.querySelectorAll(".tab-panel")!;
 const form = document.getElementById("form")!;
 const arrow = document.querySelector(".arrow")!;
 const shareBtn = document.getElementById("shareBtn")!;
+const canvasEl = document.getElementById("canvas")!;
 
 arrow.addEventListener("click", () => {
   form.classList.toggle("folded");
@@ -51,11 +52,16 @@ tabButtons.forEach((button) => {
 const depthInput = document.querySelector("#depthInput")!;
 
 let fileDefined = false;
+let fileDefinedTimestamp = 0;
 
 export class FBO {
   #scene: THREE.Scene;
   #camera: THREE.OrthographicCamera;
-  #rtt: THREE.WebGLRenderTarget;
+
+  #rtt1: THREE.WebGLRenderTarget;
+  #rtt2: THREE.WebGLRenderTarget;
+  #currentRtt: THREE.WebGLRenderTarget;
+
   #mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   #renderer: THREE.WebGLRenderer;
 
@@ -87,7 +93,9 @@ export class FBO {
       type: THREE.FloatType,
     };
 
-    this.#rtt = new THREE.WebGLRenderTarget(width, height, options);
+    this.#rtt1 = new THREE.WebGLRenderTarget(width, height, options);
+    this.#rtt2 = new THREE.WebGLRenderTarget(width, height, options);
+    this.#currentRtt = this.#rtt1;
     this.#renderer = renderer;
 
     const bufferGeometry = new THREE.BufferGeometry();
@@ -228,9 +236,9 @@ export class FBO {
 
         const z = depthData.data[depthY * depthWidth * 4 + depthX * 4];
 
-        data[i] = ((x % width) / width - 0.5) * 10;
-        data[i + 1] = (1 - x / width / height - 0.5) * 10;
-        data[i + 2] = Math.log2(z) * 0.5;
+        data[i] = ((x % width) / width - 0.5) * 20;
+        data[i + 1] = (1 - x / width / height - 0.5) * 20;
+        data[i + 2] = Math.log2(z);
 
         if (Number.isNaN(data[i + 2])) {
           data[i + 2] = 0;
@@ -243,6 +251,7 @@ export class FBO {
       }
 
       fileDefined = true;
+      fileDefinedTimestamp = performance.now();
 
       document.body.classList.remove("loading");
       form.classList.add("folded");
@@ -261,13 +270,19 @@ export class FBO {
   }
 
   update() {
-    this.#renderer.setRenderTarget(this.#rtt);
+    const nextRtt = this.#currentRtt === this.#rtt1 ? this.#rtt2 : this.#rtt1;
+    let timestamp = fileDefined
+      ? performance.now() - fileDefinedTimestamp
+      : Math.sin(performance.now() * 0.001) * 500;
+    this.#mesh.material.uniforms.timestamp.value = timestamp;
+
+    this.#renderer.setRenderTarget(nextRtt);
     this.#renderer.render(this.#scene, this.#camera);
     this.#renderer.setRenderTarget(null);
 
-    if (!fileDefined) {
-      this.particles.material.uniforms.positions.value = this.#rtt.texture;
-    }
+    this.particles.material.uniforms.positions.value = nextRtt.texture;
+
+    this.#currentRtt = nextRtt;
   }
 }
 
@@ -306,11 +321,11 @@ function init() {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(60, w / h, 1, 10000);
 
-  camera.position.set(0.5, -0.25, 10);
+  camera.position.set(0.5, -0.25, 25);
   camera.lookAt(0, 0, 0);
 
   renderer = new THREE.WebGLRenderer({
-    canvas: document.querySelector("#canvas")!,
+    canvas: canvasEl,
     preserveDrawingBuffer: true,
   });
   renderer.setSize(w, h);
@@ -318,7 +333,7 @@ function init() {
   const width = 512;
   const height = 512;
 
-  const data = getSphereData(width, height, 5);
+  const data = getSphereData(width, height, 10);
 
   const positions = new THREE.DataTexture(
     data,
@@ -331,7 +346,10 @@ function init() {
   positions.needsUpdate = true;
 
   const simulationShader = new THREE.ShaderMaterial({
-    uniforms: { positions: { value: positions } },
+    uniforms: {
+      positions: { value: positions },
+      timestamp: { value: 0 },
+    },
     vertexShader: `
       out vec2 vUv;
 
@@ -342,10 +360,17 @@ function init() {
     `,
     fragmentShader: `
       uniform sampler2D positions;
+      uniform float timestamp;
       in vec2 vUv;
 
       void main() {
-        gl_FragColor = texture2D(positions, vUv);
+        vec4 pos = texture2D(positions, vUv);
+        float force = clamp(timestamp / 5000., 0., 1.);
+
+        pos.x += sin(timestamp * 0.001 * pos.a / (float(2 << 20))) * (1. - force) * 5.0;
+        pos.y += cos(timestamp * 0.001 * pos.a / (float(2 << 20))) * (1. - force) * 5.0;
+        pos.z += sin(timestamp * 0.001 * pos.a / (float(2 << 20))) * (1. - force) * 5.0;
+        gl_FragColor = pos;
       }
     `,
   });
@@ -353,7 +378,7 @@ function init() {
   const renderShader = new THREE.ShaderMaterial({
     uniforms: {
       positions: { value: null },
-      pointSize: { value: 2 },
+      pointSize: { value: 1 },
     },
     vertexShader: `
       out vec3 vColor;
@@ -379,7 +404,7 @@ function init() {
       in vec3 vColor;
 
       void main() {
-        gl_FragColor = vec4(vColor, 1.0);
+        gl_FragColor = vec4(vColor, 0.7);
       }
     `,
     transparent: true,
@@ -432,8 +457,6 @@ async function shareImage() {
   navigator
     .share({
       files: [file],
-      url: window.location.href,
-      text: "Check out my portrait photo in 3D!",
     })
     .catch((error) => console.error("Error sharing:", error));
 }
