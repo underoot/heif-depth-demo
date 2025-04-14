@@ -225,10 +225,11 @@ export class FBO {
         const depthX = Math.floor(((x % width) / width) * depthWidth);
         const depthY = Math.floor((x / width / height) * depthHeight);
 
-        data[i] = (x % width) / width - 0.5;
-        data[i + 1] = 1 - x / width / height - 0.5;
-        data[i + 2] =
-          depthData.data[depthY * depthWidth * 4 + depthX * 4] / 255 - 0.5;
+        const z = depthData.data[depthY * depthWidth * 4 + depthX * 4];
+
+        data[i] = ((x % width) / width - 0.5) * 10;
+        data[i + 1] = (1 - x / width / height - 0.5) * 10;
+        data[i + 2] = Math.log2(z) * 0.5;
 
         if (Number.isNaN(data[i + 2])) {
           data[i + 2] = 0;
@@ -304,7 +305,7 @@ function init() {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(60, w / h, 1, 10000);
 
-  camera.position.set(0.5, -0.25, 3);
+  camera.position.set(0.5, -0.25, 10);
   camera.lookAt(0, 0, 0);
 
   renderer = new THREE.WebGLRenderer({
@@ -315,7 +316,7 @@ function init() {
   const width = 512;
   const height = 512;
 
-  const data = getSphereData(width, height, 1);
+  const data = getSphereData(width, height, 5);
 
   const positions = new THREE.DataTexture(
     data,
