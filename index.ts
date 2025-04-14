@@ -5,6 +5,8 @@ import libheif from "./libheif/index.js";
 const helpBtn = document.getElementById("helpBtn")!;
 const helpBtn2 = document.getElementById("helpBtn2")!;
 const modal = document.getElementById("modal")!;
+const errorModal = document.getElementById("errorModal")!;
+const closeErrorModal = document.getElementById("closeErrorModal")!;
 const closeModal = document.getElementById("closeModal")!;
 const tabButtons = document.querySelectorAll(".tab-button")!;
 const tabPanels = document.querySelectorAll(".tab-panel")!;
@@ -28,6 +30,20 @@ helpBtn2.addEventListener("click", () => {
 closeModal.addEventListener("click", () => {
   modal.classList.add("hidden");
 });
+
+closeErrorModal.addEventListener("click", () => {
+  errorModal.classList.add("hidden");
+});
+
+// @ts-ignore
+if (
+  navigator.canShare &&
+  navigator.canShare({
+    files: [new File(["test"], "image.png", { type: "image/png" })],
+  })
+) {
+  shareBtn.classList.remove("hidden");
+}
 
 tabButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -155,117 +171,122 @@ export class FBO {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      document.body.classList.add("loading");
-      const heicBuffer = await file.arrayBuffer();
-      const decoder = new libheif.HeifDecoder();
-      const [heifImage] = decoder.decode(heicBuffer);
-      const auxImageIds =
-        libheif.heif_js_image_handle_get_list_of_aux_image_IDs(
-          heifImage.handle
+      try {
+        document.body.classList.add("loading");
+        const heicBuffer = await file.arrayBuffer();
+        const decoder = new libheif.HeifDecoder();
+        const [heifImage] = decoder.decode(heicBuffer);
+        const auxImageIds =
+          libheif.heif_js_image_handle_get_list_of_aux_image_IDs(
+            heifImage.handle
+          );
+
+        let depthImage;
+
+        let canvas = document.createElement("canvas");
+        canvas.width = heifImage.get_width();
+        canvas.height = heifImage.get_height();
+
+        let ctx = canvas.getContext("2d")!;
+
+        let imageData = ctx.createImageData(
+          heifImage.get_width(),
+          heifImage.get_height()
         );
 
-      let depthImage;
+        await new Promise<void>((resolve, reject) => {
+          heifImage.display(imageData, (displayData) => {
+            if (!displayData) {
+              return reject(new Error("HEIF processing error"));
+            }
 
-      let canvas = document.createElement("canvas");
-      canvas.width = heifImage.get_width();
-      canvas.height = heifImage.get_height();
-
-      let ctx = canvas.getContext("2d")!;
-
-      let imageData = ctx.createImageData(
-        heifImage.get_width(),
-        heifImage.get_height()
-      );
-
-      await new Promise<void>((resolve, reject) => {
-        heifImage.display(imageData, (displayData) => {
-          if (!displayData) {
-            return reject(new Error("HEIF processing error"));
-          }
-
-          resolve();
+            resolve();
+          });
         });
-      });
 
-      for (let auxID of auxImageIds) {
-        const auxImage = new libheif.HeifImage(
-          libheif.heif_js_context_get_image_handle(decoder.decoder, auxID)
+        for (let auxID of auxImageIds) {
+          const auxImage = new libheif.HeifImage(
+            libheif.heif_js_context_get_image_handle(decoder.decoder, auxID)
+          );
+
+          if (
+            libheif.heif_js_image_handle_get_auxiliary_type(auxImage.handle) ===
+            "urn:mpeg:hevc:2015:auxid:2"
+          ) {
+            depthImage = auxImage;
+            break;
+          }
+        }
+
+        canvas = document.createElement("canvas");
+        ctx = canvas.getContext("2d")!;
+
+        canvas.width = depthImage.get_width();
+        canvas.height = depthImage.get_height();
+        const depthData = ctx.createImageData(
+          depthImage.get_width(),
+          depthImage.get_height()
         );
 
-        if (
-          libheif.heif_js_image_handle_get_auxiliary_type(auxImage.handle) ===
-          "urn:mpeg:hevc:2015:auxid:2"
-        ) {
-          depthImage = auxImage;
-          break;
-        }
-      }
+        await new Promise<void>((resolve, reject) => {
+          depthImage.display(depthData, (displayData) => {
+            if (!displayData) {
+              return reject(new Error("HEIF processing error"));
+            }
 
-      canvas = document.createElement("canvas");
-      ctx = canvas.getContext("2d")!;
+            resolve();
+          });
+        });
 
-      canvas.width = depthImage.get_width();
-      canvas.height = depthImage.get_height();
-      const depthData = ctx.createImageData(
-        depthImage.get_width(),
-        depthImage.get_height()
-      );
+        const width = heifImage.get_width();
+        const height = heifImage.get_height();
+        const depthWidth = depthImage.get_width();
+        const depthHeight = depthImage.get_height();
 
-      await new Promise<void>((resolve, reject) => {
-        depthImage.display(depthData, (displayData) => {
-          if (!displayData) {
-            return reject(new Error("HEIF processing error"));
+        const data = new Float32Array(width * height * 4);
+
+        for (let i = 0; i < data.length; i += 4) {
+          const x = Math.floor(i / 4);
+
+          const depthX = Math.floor(((x % width) / width) * depthWidth);
+          const depthY = Math.floor((x / width / height) * depthHeight);
+
+          const z = depthData.data[depthY * depthWidth * 4 + depthX * 4];
+
+          data[i] = ((x % width) / width - 0.5) * 20;
+          data[i + 1] = (1 - x / width / height - 0.5) * 20;
+          data[i + 2] = Math.log2(z);
+
+          if (Number.isNaN(data[i + 2])) {
+            data[i + 2] = 0;
           }
 
-          resolve();
-        });
-      });
-
-      const width = heifImage.get_width();
-      const height = heifImage.get_height();
-      const depthWidth = depthImage.get_width();
-      const depthHeight = depthImage.get_height();
-
-      const data = new Float32Array(width * height * 4);
-
-      for (let i = 0; i < data.length; i += 4) {
-        const x = Math.floor(i / 4);
-
-        const depthX = Math.floor(((x % width) / width) * depthWidth);
-        const depthY = Math.floor((x / width / height) * depthHeight);
-
-        const z = depthData.data[depthY * depthWidth * 4 + depthX * 4];
-
-        data[i] = ((x % width) / width - 0.5) * 20;
-        data[i + 1] = (1 - x / width / height - 0.5) * 20;
-        data[i + 2] = Math.log2(z);
-
-        if (Number.isNaN(data[i + 2])) {
-          data[i + 2] = 0;
+          data[i + 3] =
+            imageData.data[i] +
+            (imageData.data[i + 1] << 8) +
+            (imageData.data[i + 2] << 16);
         }
 
-        data[i + 3] =
-          imageData.data[i] +
-          (imageData.data[i + 1] << 8) +
-          (imageData.data[i + 2] << 16);
+        fileDefined = true;
+        fileDefinedTimestamp = performance.now();
+
+        const positions = new THREE.DataTexture(
+          data,
+          width,
+          height,
+          THREE.RGBAFormat,
+          THREE.FloatType
+        );
+        positions.needsUpdate = true;
+
+        this.#mesh.material.uniforms.positions.value = positions;
+
+        form.classList.add("folded");
+      } catch {
+        errorModal.classList.remove("hidden");
+      } finally {
+        document.body.classList.remove("loading");
       }
-
-      fileDefined = true;
-      fileDefinedTimestamp = performance.now();
-
-      document.body.classList.remove("loading");
-      form.classList.add("folded");
-
-      const positions = new THREE.DataTexture(
-        data,
-        width,
-        height,
-        THREE.RGBAFormat,
-        THREE.FloatType
-      );
-      positions.needsUpdate = true;
-
-      this.#mesh.material.uniforms.positions.value = positions;
     });
   }
 
@@ -453,6 +474,16 @@ async function shareImage() {
   if (!blob) return;
 
   const file = new File([blob], "image.png", { type: "image/png" });
+
+  if (!navigator.canShare) {
+    console.error("Share API not supported");
+    return;
+  }
+
+  if (!navigator.canShare({ files: [file] })) {
+    console.error("Cannot share this file");
+    return;
+  }
 
   navigator
     .share({

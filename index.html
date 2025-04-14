@@ -4,8 +4,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <meta property="og:title" content="HEIF Depth Visualizer">
+  <meta property="og:description" content="Upload a HEIF file with depth data to visualize it in 3D.">
+  <meta property="og:image" content="images/preview.png">
+  <meta property="og:url" content="https://underoot.dev/heif-depth-visualizer">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="HEIF Depth Visualizer">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="HEIF Depth Visualizer">
+  <meta name="twitter:description" content="Upload a HEIF file with depth data to visualize it in 3D.">
+  <meta name="twitter:image" content="images/preview.png">
+  <meta name="twitter:site" content="@underoot">
+  <meta name="twitter:creator" content="@underoot">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="description" content="Upload a HEIF file with depth data to visualize it in 3D.">
+  <meta name="keywords" content="HEIF, Depth, Visualizer, 3D, Upload, File">
+  <meta name="author" content="Aleksandr Shoronov">
   <script defer data-domain="underoot.dev" src="https://stat2.underoot.dev/js/script.js"></script>
-  <title>HEIC to 3D Viewer</title>
+  <link rel="icon" href="favicon.ico" type="image/ico">
+  <title>HEIF Depth Visualizer</title>
   <style>
     @import "tailwindcss";
     @import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -72,16 +90,16 @@
   </div>
   <canvas id="canvas"></canvas>
   <div id="form" class="relative bg-white shadow-xl rounded-2xl p-8 pb-12 max-w-lg w-full relative">
-    <button id="helpBtn" class="absolute top-4 right-4 text-blue-500 hover:text-blue-700 text-xl">
+    <button id="helpBtn" class="absolute top-4 right-4 text-blue-500 hover:text-blue-700 text-xl cursor-pointer">
       <i class="fa-solid fa-circle-question"></i>
     </button>
-    <h2 class="text-2xl font-semibold mb-4">HEIC Depth visualizer</h2>
+    <h2 class="text-2xl font-semibold mb-4">HEIF Depth Visualizer</h2>
     <p class="text-gray-600 mb-4">
-      Upload a HEIC file with depth data to visualize it in 3D. 
-      If you don't have a HEIC file, you can use the <span class="text-blue-500 cursor-pointer" id="helpBtn2">help</span> button to learn how to export one.<br><br>
+      Upload a HEIF file with depth data to visualize it in 3D. 
+      If you don't have a HEIF file, you can use the <span class="text-blue-500 cursor-pointer" id="helpBtn2">help</span> button to learn how to export one.<br><br>
       You can browse the scene by panning, pitching, and zooming with your mouse or touchscreen.
     </p>
-    <input type="file" accept=".heic" id="depthInput" class="block text-sm text-gray-600
+    <input type="file" accept=".heic" id="depthInput" class="block text-sm text-gray-600 w-full
       file:mr-4 file:py-2 file:px-4
       file:rounded-lg file:border-0
       file:text-sm file:font-semibold
@@ -93,14 +111,25 @@
       </div>
   </div>
 
-  <!-- Modal -->
+  <div id="errorModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm items-center justify-center flex z-50 hidden">
+    <div class="bg-white rounded-xl max-w-2xl w-full shadow-lg p-6 relative">
+      <button id="closeErrorModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-lg cursor-pointer">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <h2 class="text-xl font-semibold mb-4">Error</h2>
+      <p id="errorMessage" class="text-gray-700">
+        Something went wrong while processing the file. Please make sure you uploaded a valid HEIF file with depth data.
+      </p>
+    </div>
+  </div>
   <div id="modal" class="flex items-center justify-center fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50">
     <div class="bg-white rounded-xl max-w-2xl w-full shadow-lg p-6 relative">
       <button id="closeModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-lg">
         <i class="fa-solid fa-xmark"></i>
       </button>
 
-      <h2 class="text-xl font-semibold mb-4">How to Export HEIC with Depth</h2>
+      <h2 class="text-xl font-semibold mb-4">How to Export HEIF with Depth</h2>
 
       <div class="border-b mb-4">
         <nav class="flex space-x-4 text-sm font-medium" id="tabs">
@@ -114,11 +143,11 @@
           <ul class="list-disc pl-6 text-gray-700 space-y-2" style="max-height: 70vh; overflow-y: auto;">
             <li>Click on "Choose file"</li>
             <li>Type "Portrait" in search box and select "Portrait"</li>
-            <img src="images/01.jpeg" alt="Type 'Portrait' in the search and select 'Portrait'" class="w-full mb-4">
+            <img src="images/ios_01.jpeg" alt="Type 'Portrait' in the search and select 'Portrait'" class="w-full mb-4">
             <li>Locate and click settings button in the photos screen</li>
-            <img src="images/02.jpeg" alt="Locate and click settings button in the photos screen" class="w-full mb-4">
+            <img src="images/ios_02.jpeg" alt="Locate and click settings button in the photos screen" class="w-full mb-4">
             <li>Ensure that "Current" format is selected</li>
-            <img src="images/03.jpeg" alt="Ensure that 'Current' format is selected" class="w-full mb-4">
+            <img src="images/ios_03.jpeg" alt="Ensure that 'Current' format is selected" class="w-full mb-4">
             <li>Choose one file and click "Done"</li>
           </ul>
         </div>
@@ -127,7 +156,7 @@
             <li>Connect your iPhone to your Mac.</li>
             <li>Open the Photos app on macOS.</li>
             <li>Find and export a portrait photo using "Export Unmodified Original".</li>
-            <li>Make sure it's a .HEIC file with depth data.</li>
+            <li>Make sure it's a .heic file.</li>
             <li>Upload it here.</li>
           </ul>
         </div>
@@ -135,7 +164,7 @@
     </div>
   </div>
   <!-- Share button -->
-  <div id="shareBtn" class="fixed bottom-4 right-4 bg-blue-500 text-white rounded-full p-3 shadow-lg cursor-pointer hover:bg-blue-600 transition duration-200 w-12 items-center text-center">
+  <div id="shareBtn" class="fixed bottom-4 right-4 bg-blue-500 text-white rounded-full p-3 shadow-lg cursor-pointer hover:bg-blue-600 transition duration-200 w-12 items-center text-center hidden">
     <i class="fa-solid fa-share-alt"></i>
   </div>
   <script type="module" src="./index.ts"></script>
